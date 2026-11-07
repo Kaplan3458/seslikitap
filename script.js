@@ -14,14 +14,110 @@ function setView(view){if(view==='reader'&&!state.pdf)playerMessage('Dinlemek i�
 document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>setView(button.dataset.view)));
 $('home-link').addEventListener('click',e=>{e.preventDefault();setView('home')});
 ['header-upload-btn','hero-upload-btn','library-upload-btn','empty-upload-btn','reader-upload-btn'].forEach(id=>$(id).addEventListener('click',()=>el.pdfInput.click()));
-function resumeBook(){if(state.pdf){setView('reader');return}const book=getCurrentBook();if(book){toast('Kayıtlı eser: '+book.name+'. Devam etmek için aynı PDF dosyasını yeniden seçin.');el.pdfInput.click()}else{setView('library')}}
+// Store original PDF bytes on this device, not on a server. Older V2 books
+// may only have metadata; those need a one-time re-import.
+const PDF_DB_NAME='sesli_kitap_local_v3';
+function openPdfDB(){
+  return new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window)){reject(new Error('indexeddb-unavailable'));return}
+    const req=indexedDB.open(PDF_DB_NAME,1);
+    req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('pdfs'))req.result.createObjectStore('pdfs',{keyPath:'id'})};
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error||new Error('indexeddb-open-failed'));
+    req.onblocked=()=>reject(new Error('indexeddb-blocked'));
+  });
+}
+async function withPdfStore(mode,operation){
+  const db=await openPdfDB();
+  try{
+    return await new Promise((resolve,reject)=>{
+      let transaction;
+      try{transaction=db.transaction('pdfs',mode)}catch(error){reject(error);return}
+      const request=operation(transaction.objectStore('pdfs'));
+      let result;
+      request.onsuccess=()=>{result=request.result};
+      transaction.oncomplete=()=>resolve(result);
+      transaction.onerror=()=>reject(transaction.error||new Error('indexeddb-transaction-failed'));
+      transaction.onabort=()=>reject(transaction.error||new Error('indexeddb-transaction-aborted'));
+    });
+  }finally{db.close()}
+}
+async function persistPdf(file,id){
+  return withPdfStore('readwrite',store=>store.put({id,name:file.name,size:file.size,lastModified:file.lastModified,blob:file}));
+}
+async function savedPdf(id){return withPdfStore('readonly',store=>store.get(id))}
+async function deleteStoredPdf(id){return withPdfStore('readwrite',store=>store.delete(id))}
+async function openSavedBook(book){
+  if(book.id===state.bookId&&state.pdf){setView('reader');return}
+  toast('Kitap kütüphanenizden açılıyor...');
+  try{
+    const stored=await savedPdf(book.id);
+    if(!stored?.blob){
+      toast('Bu kitap eski sürümde yalnızca isim olarak kaydedilmiş. PDF dosyasını bir kez daha seçmeniz gerekiyor.');
+      el.pdfInput.click();return;
+    }
+    const file=new File([stored.blob],stored.name,{type:'application/pdf',lastModified:stored.lastModified});
+    await handlePdfUpload(file,{fromSaved:true});
+  }catch(error){
+    console.error('Kaydedilmiş PDF açılamadı:',error);
+    toast('Kaydedilen PDF açılamadı. Tarayıcı depolaması engellenmiş veya temizlenmiş olabilir. Dosyayı yeniden ekleyin.');
+  }
+}
+function resumeBook(){
+  if(state.pdf){setView('reader');return}
+  const book=getCurrentBook();
+  if(book)void openSavedBook(book);else setView('library');
+}
 $('resume-btn').addEventListener('click',resumeBook);$('recent-book-btn').addEventListener('click',resumeBook);
 function loadBooks(){try{const books=JSON.parse(getSafe('sk_v2_books')||'[]');return Array.isArray(books)?books:[]}catch{return []}}
 function storeBooks(books){setSafe('sk_v2_books',JSON.stringify(books.slice(0,60)))}
 function getCurrentBook(){return loadBooks()[0]||null}
 function bookKey(file){return `${file.name}:${file.size}:${file.lastModified}`}
 function saveProgress(){if(!state.bookId)return;const books=loadBooks();const index=books.findIndex(b=>b.id===state.bookId);if(index<0)return;books[index]={...books[index],page:state.currentPage,sentence:state.currentSentenceIndex,lastOpened:Date.now()};books.sort((a,b)=>b.lastOpened-a.lastOpened);storeBooks(books)}
-function renderLibrary(){const books=loadBooks();$('library-count').textContent=books.length?`${books.length} eser`:'Henüz kitap eklenmedi';$('library-empty').hidden=books.length>0;const grid=$('library-items');grid.replaceChildren();books.forEach(book=>{const card=document.createElement('article');card.className='book-card';const art=document.createElement('div');art.className='book-art';const title=document.createElement('h3');title.textContent=book.name;const meta=document.createElement('p');meta.textContent=book.page?`Son okunan sayfa: ${book.page}`:'Henüz okunmadı';const button=document.createElement('button');button.textContent=book.id===state.bookId?'Okumaya devam et':'Dosyayı yeniden seç';button.addEventListener('click',()=>{if(book.id===state.bookId){setView('reader')}else{toast('Tarayıcınız PDF dosyasını saklamıyor. Lütfen aynı dosyayı yeniden seçin.');el.pdfInput.click()}});card.append(art,title,meta,button);grid.append(card)});const recent=getCurrentBook();$('recent-book-caption').textContent=recent?`${recent.name} · Sayfa ${recent.page||1}`:'Henüz bir eser eklemediniz. İlk kitabınızla başlayın.'}
+async function deleteBook(book){
+  if(!window.confirm(`“${book.name}” kitabını kütüphanenden kaldırmak istiyor musun?\n\nKaydedilmiş PDF de bu cihazdan silinecek. Bu işlem geri alınamaz.`))return;
+  const removeButton=document.querySelector(`[data-delete-id="${CSS.escape(book.id)}"]`);
+  if(removeButton)removeButton.disabled=true;
+  try{
+    await deleteStoredPdf(book.id);
+    if(state.bookId===book.id){
+      stopPlayback();++state.transition;
+      const oldPdf=state.pdf;
+      state.pdf=null;state.file=null;state.bookId=null;state.numPages=0;state.currentPage=0;state.sentences=[];state.currentSentenceIndex=0;state.pageTextCache.clear();
+      if(oldPdf)await oldPdf.destroy().catch(()=>{});
+      $('reader-book-title').textContent='Okuma Odası';
+      el.pageIndicator.textContent='Sayfa - / -';
+      el.textDisplay.textContent='Kitap kaldırıldı. Başka bir kitap seçebilirsin.';
+      setView('library');
+    }
+    storeBooks(loadBooks().filter(item=>item.id!==book.id));
+    renderLibrary();toast('Kitap ve kaydedilen PDF kaldırıldı.');
+  }catch(error){
+    console.error('Kitap silinemedi:',error);
+    toast('Kitap silinemedi. Cihaz depolamasını kontrol edip yeniden deneyin.');
+    if(removeButton)removeButton.disabled=false;
+  }
+}
+function renderLibrary(){
+  const books=loadBooks();
+  $('library-count').textContent=books.length?`${books.length} kitap`:'Henüz kitap eklenmedi';
+  $('library-empty').hidden=books.length>0;
+  const grid=$('library-items');grid.replaceChildren();
+  books.forEach(book=>{
+    const card=document.createElement('article');card.className='book-card';
+    const art=document.createElement('div');art.className='book-art';art.setAttribute('aria-hidden','true');
+    const title=document.createElement('h3');title.textContent=book.name;
+    const meta=document.createElement('p');meta.textContent=book.page?`Kaldığın sayfa: ${book.page}`:'Henüz okunmadı';
+    const actions=document.createElement('div');actions.className='book-actions';
+    const openButton=document.createElement('button');openButton.className='book-open';openButton.type='button';openButton.textContent='Kitabı aç';openButton.addEventListener('click',()=>void openSavedBook(book));
+    const removeButton=document.createElement('button');removeButton.className='book-delete';removeButton.type='button';removeButton.dataset.deleteId=book.id;removeButton.textContent='Kaldır';removeButton.setAttribute('aria-label',`${book.name} kitabını kaldır`);removeButton.addEventListener('click',()=>void deleteBook(book));
+    actions.append(openButton,removeButton);card.append(art,title,meta,actions);grid.append(card);
+  });
+  const recent=getCurrentBook();
+  $('recent-book-caption').textContent=recent?`${recent.name} · Sayfa ${recent.page||1}`:'Henüz bir kitap eklemedin. İlk kitabınla başlayabilirsin.';
+  $('recent-book-btn').disabled=!recent;
+  $('resume-btn').disabled=!recent&&!state.pdf;
+} 
 function loadSettings(){const rate=Number(getSafe('sk_rate')),pitch=Number(getSafe('sk_pitch'));if(Number.isFinite(rate)&&rate>=.5&&rate<=2)state.rate=rate;if(getSafe('sk_pitch')!==null&&Number.isFinite(pitch)&&pitch>=0&&pitch<=2)state.pitch=pitch;el.rateSlider.value=state.rate;el.pitchSlider.value=state.pitch;el.rateValue.textContent=state.rate.toFixed(1)+'x';el.pitchValue.textContent=state.pitch.toFixed(1)}
 function populateVoiceList(){if(!canSpeak){el.voiceSelect.innerHTML='<option>Bu tarayıcıda seslendirme yok</option>';return}const voices=speechSynthesis.getVoices();if(!voices.length)return;const sorted=[...voices].sort((a,b)=>Number(!a.lang.toLowerCase().startsWith('tr'))-Number(!b.lang.toLowerCase().startsWith('tr'))||a.name.localeCompare(b.name,'tr'));const selected=getSafe('sk_voice');el.voiceSelect.replaceChildren();sorted.forEach(v=>{const option=document.createElement('option');option.value=v.voiceURI;option.textContent=`${v.name} (${v.lang})`;el.voiceSelect.append(option)});state.voice=sorted.find(v=>v.voiceURI===selected)||sorted.find(v=>v.lang.toLowerCase().startsWith('tr'))||sorted[0];el.voiceSelect.value=state.voice.voiceURI}
 async function acquireWakeLock(){try{if('wakeLock' in navigator&&!wakeLock)wakeLock=await navigator.wakeLock.request('screen')}catch(err){console.info('Wake lock alınamadı',err)}}
@@ -40,7 +136,39 @@ function speakCurrentSentence(){if(!state.isPlaying||!canSpeak)return;invalidate
 async function onPageFinished(){if(!state.isPlaying)return;if(el.autoPageCheckbox.checked&&state.currentPage<state.numPages){await goToPage(state.currentPage+1,{continuePlaying:true})}else{stopPlayback();playerMessage('Bu sayfanın okuması tamamlandı.')}}
 function startPlayback(){if(!state.pdf){toast('Önce bir PDF ekleyin.');return}if(!canSpeak){toast('Bu tarayıcı seslendirmeyi desteklemiyor.');return}if(!state.sentences.length){toast('Bu sayfada okunabilir metin yok.');return}state.isPlaying=true;updatePlayButton();void acquireWakeLock();speakCurrentSentence()}
 function changeSentence(delta){if(!state.sentences.length)return;state.currentSentenceIndex=clamp(state.currentSentenceIndex+delta,0,state.sentences.length-1);highlightSentence(state.currentSentenceIndex);saveProgress();if(state.isPlaying)speakCurrentSentence()}
-async function handlePdfUpload(file){if(!file)return;if(!/\.pdf$/i.test(file.name)&&file.type!=='application/pdf'){toast('Lütfen PDF dosyası seçin.');return}if(!window.pdfjsLib){toast('PDF okuyucu yüklenemedi. İnternet bağlantınızı kontrol edin.');return}stopPlayback();const openId=++state.transition;toast('Kitabınız açılıyor...');try{const buffer=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buffer}).promise;if(openId!==state.transition){await pdf.destroy();return}if(state.pdf)await state.pdf.destroy();state.pdf=pdf;state.file=file;state.bookId=bookKey(file);state.numPages=pdf.numPages;state.pageTextCache.clear();const books=loadBooks();const previous=books.find(b=>b.id===state.bookId);const keep=books.filter(b=>b.id!==state.bookId);keep.unshift({id:state.bookId,name:file.name.replace(/\.pdf$/i,''),page:previous?.page||1,sentence:previous?.sentence||0,lastOpened:Date.now()});storeBooks(keep);$('reader-book-title').textContent=file.name.replace(/\.pdf$/i,'');await goToPage(previous?.page||1,{resumeSentence:previous?.sentence||0});setView('reader');playerMessage('Eser hazır. Dinlemek için Oku düğmesine basın.');toast('PDF açıldı. Dosyanız cihazınızda işlendi.')}catch(err){console.error(err);toast('PDF açılamadı. Dosyanın bozuk ya da şifreli olmadığını kontrol edin.')}}
+async function handlePdfUpload(file,{fromSaved=false}={}){
+  if(!file)return;
+  if(!/\.pdf$/i.test(file.name)&&file.type!=='application/pdf'){toast('Lütfen PDF dosyası seçin.');return}
+  if(!window.pdfjsLib){toast('PDF okuyucu yüklenemedi. İnternet bağlantınızı kontrol edin.');return}
+  stopPlayback();
+  const openId=++state.transition;
+  toast('Kitabınız açılıyor...');
+  try{
+    const buffer=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buffer}).promise;
+    if(openId!==state.transition){await pdf.destroy();return}
+    if(state.pdf)await state.pdf.destroy();
+    state.pdf=pdf;state.file=file;state.bookId=bookKey(file);state.numPages=pdf.numPages;state.pageTextCache.clear();
+    const books=loadBooks();
+    const previous=books.find(b=>b.id===state.bookId);
+    const keep=books.filter(b=>b.id!==state.bookId);
+    keep.unshift({id:state.bookId,name:file.name.replace(/\.pdf$/i,''),page:previous?.page||1,sentence:previous?.sentence||0,lastOpened:Date.now()});
+    storeBooks(keep);
+    $('reader-book-title').textContent=file.name.replace(/\.pdf$/i,'');
+    await goToPage(previous?.page||1,{resumeSentence:previous?.sentence||0});
+    setView('reader');
+    playerMessage('Eser hazır. Dinlemek için Oku düğmesine basın.');
+    if(!fromSaved){
+      try{
+        await persistPdf(file,state.bookId);
+        toast('PDF kütüphanenize kaydedildi. Bir dahaki sefer yeniden seçmenize gerek yok.');
+      }catch(storageError){
+        console.warn('PDF saklanamadı:',storageError);
+        toast('PDF açıldı ama cihazınıza kaydedilemedi. Yeterli depolama alanı olduğundan ve gizli modda olmadığınızdan emin olun.');
+      }
+    }else toast('Kitap kaldığınız yerden açıldı.');
+  }catch(err){console.error(err);toast('PDF açılamadı. Dosyanın bozuk ya da şifreli olmadığını kontrol edin.')}
+}
 el.pdfInput.addEventListener('change',e=>{const file=e.target.files?.[0];if(file)void handlePdfUpload(file);el.pdfInput.value=''});
 el.playPauseBtn.addEventListener('click',()=>state.isPlaying?stopPlayback():startPlayback());el.prevSentenceBtn.addEventListener('click',()=>changeSentence(-1));el.nextSentenceBtn.addEventListener('click',()=>changeSentence(1));el.prevPageBtn.addEventListener('click',()=>{void goToPage(state.currentPage-1,{continuePlaying:state.isPlaying})});el.nextPageBtn.addEventListener('click',()=>{void goToPage(state.currentPage+1,{continuePlaying:state.isPlaying})});
 el.rateSlider.addEventListener('input',()=>{state.rate=Number(el.rateSlider.value);el.rateValue.textContent=state.rate.toFixed(1)+'x';setSafe('sk_rate',state.rate);if(state.isPlaying)speakCurrentSentence()});el.pitchSlider.addEventListener('input',()=>{state.pitch=Number(el.pitchSlider.value);el.pitchValue.textContent=state.pitch.toFixed(1);setSafe('sk_pitch',state.pitch);if(state.isPlaying)speakCurrentSentence()});el.voiceSelect.addEventListener('change',()=>{state.voice=canSpeak?speechSynthesis.getVoices().find(v=>v.voiceURI===el.voiceSelect.value)||null:null;if(state.voice)setSafe('sk_voice',state.voice.voiceURI);if(state.isPlaying)speakCurrentSentence()});
