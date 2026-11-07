@@ -27,3 +27,18 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 [hidden]{display:none!important}
 @media(max-width:950px){.hero{grid-template-columns:1fr;gap:20px}.hero-photo{height:340px;min-height:0;max-width:650px;width:100%;margin:0 auto 18px}.hero-content{max-width:690px}}
 @media(max-width:550px){.hero-photo{height:245px;margin-top:3px}.photo-credit{font-size:11px;padding:25px 13px 13px}.book-actions button{min-height:44px}.hero h1{font-size:clamp(35px,10vw,47px)}.hero{padding-bottom:35px}}
+
+/* V2.3 — kitap odaklı kimlik, tutarlı tipografi ve nazik arayüz */
+.brand-logo{width:52px;height:52px;object-fit:contain;flex:none;display:block}
+.brand-name{font-family:'Playfair Display',Georgia,serif;font-size:23px;font-weight:700;line-height:1.08;letter-spacing:0;white-space:nowrap}
+.brand-name small{display:block;margin-top:7px;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;letter-spacing:.105em;color:#877249;white-space:nowrap}
+.hero h1{letter-spacing:-.035em}
+.hero p{font-size:15px;line-height:1.95;max-width:570px}
+.hero .eyebrow{font-size:11px}
+.hero-note{font-size:12px;line-height:1.6}
+.page-banner:after{content:'';width:270px;height:270px;right:4%;top:-55px;background:url('kitap-logo.png') center / contain no-repeat;opacity:.095}
+.book-art:before{content:'';display:block;width:110px;height:110px;background:url('kitap-logo.png') center / contain no-repeat;opacity:.8}
+.pattern-card:after{content:'';width:190px;height:190px;right:-20px;top:-36px;background:url('kitap-logo.png') center / contain no-repeat;opacity:.12}
+.empty-glyph{font-size:0;display:inline-block;width:90px;height:90px;background:url('kitap-logo.png') center / contain no-repeat}
+.feature-card h3{line-height:1.3}
+@media(max-width:550px){.brand-logo{width:44px;height:44px}.brand-name{font-size:19px}.brand-name small{font-size:8.5px;letter-spacing:.08em}.hero p{font-size:14px;line-height:1.85}.hero h1{font-size:clamp(33px,9vw,46px)}.hero-note{font-size:11px}}

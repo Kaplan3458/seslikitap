@@ -6,20 +6,20 @@
   <meta name="theme-color" content="#102f24">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="description" content="Kitaplarınızı huzurlu bir ortamda okuyun ve Türkçe dinleyin.">
+  <meta name="description" content="PDF kitaplarınızı cihazınızda saklayabilir, okuyabilir ve Türkçe seslendirmeyle dinleyebilirsiniz.">
   <title>Sesli Kitap | Dijital Kütüphanem</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.2">
+  <link rel="stylesheet" href="styles.css?v=2.3">
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
 <div class="site-shell">
   <header class="site-header">
     <a class="brand" href="#home" id="home-link" aria-label="Sesli Kitap ana sayfa">
-      <span class="brand-mark" aria-hidden="true">✧</span>
-      <span class="brand-name">Sesli <span>Kitap</span><small>Kişisel kütüphanen</small></span>
+      <img class="brand-logo" src="kitap-logo.png" alt="" width="56" height="56">
+      <span class="brand-name">Sesli Kitap<small>Kişisel kütüphaneniz</small></span>
     </a>
     <nav class="desktop-nav" aria-label="Ana menü">
       <button class="nav-link active" data-view="home">Ana Sayfa</button>
@@ -33,51 +33,51 @@
       <div class="hero">
         <div class="hero-pattern" aria-hidden="true"></div>
         <div class="hero-content">
-          <span class="eyebrow"><span class="gold-line"></span> KİTAPLARIN TEK BİR YERDE</span>
-          <h1>Kitapların hep<br><em>yanında olsun.</em></h1>
-          <p>PDF kitaplarını buraya ekle. İster oku, ister dinle. Kapatıp geri geldiğinde bıraktığın sayfadan devam et.</p>
+          <span class="eyebrow"><span class="gold-line"></span> KİTAPLARINIZ TEK BİR YERDE</span>
+          <h1>Kitaplarınız hep<br><em>yanınızda olsun.</em></h1>
+          <p>Destur Efendim, dinlemek istediğiniz kitapları buraya ekleyebilir, kolaylıkla dinleyip dinlerken takip edebilirsiniz. Kitaplarınızı dinlemeye istediğiniz zaman kaldığınız yerden devam edebilirsiniz.</p>
           <div class="hero-actions">
             <button id="hero-upload-btn" class="btn btn-gold" type="button">Kitap Ekle <span aria-hidden="true">↗</span></button>
-            <button class="btn btn-outline" data-view="library" type="button">Kütüphanemi Aç <span aria-hidden="true">→</span></button>
+            <button class="btn btn-outline" data-view="library" type="button">Kütüphanemi Gör <span aria-hidden="true">→</span></button>
           </div>
-          <div class="hero-note"><span class="note-star">✦</span> Kitapların bu cihazda saklanır.</div>
+          <div class="hero-note"><span class="note-star" aria-hidden="true">▣</span> Kitaplarınız internete yüklenmez, cihazınızda saklanır.</div>
         </div>
         <div class="hero-art hero-photo" aria-hidden="true">
           <img src="kutuphane-kapak.webp" alt="" width="1706" height="864" loading="eager" decoding="async">
-          <div class="photo-credit">Kitapların için ayrılmış bir köşe</div>
+          <div class="photo-credit">Kitaplığınızdan bir görünüm</div>
         </div>
       </div>
       <div class="content-area">
-        <div class="section-head"><div><span class="section-kicker">KİTAPLIĞIN</span><h2>Okumaya buradan devam et</h2></div><button class="text-link" data-view="library">Tüm kitaplar <span>→</span></button></div>
+        <div class="section-head"><div><span class="section-kicker">KÜTÜPHANENİZ</span><h2>Okumaya buradan devam edebilirsiniz</h2></div><button class="text-link" data-view="library">Tüm kitaplar <span>→</span></button></div>
         <div class="home-cards">
           <article class="feature-card">
-            <div class="feature-icon">◈</div><h3>Bütün kitapların bir arada</h3><p>Eklediğin kitapları bir arada gör ve dilediğini aç.</p><button class="feature-link" data-view="library">Kitaplığı görüntüle →</button>
+            <div class="feature-icon">◈</div><h3>Kitaplarınız bir arada</h3><p>Eklediğiniz kitapları bir arada görebilir, dilediğinizi açabilirsiniz.</p><button class="feature-link" data-view="library">Kütüphanenizi görüntüleyebilirsiniz →</button>
           </article>
           <article class="feature-card accent-card">
-            <div class="feature-icon">♫</div><h3>Okumak ya da dinlemek</h3><p>Dinlemek istediğinde Türkçe sesi ve hızını kendine göre ayarla.</p><button class="feature-link" data-view="reader">Okuyucuya geç →</button>
+            <div class="feature-icon">♫</div><h3>Okumak ya da dinlemek</h3><p>Dinlerken Türkçe anlatıcı sesini ve okuma hızını tercihlerinize göre ayarlayabilirsiniz.</p><button class="feature-link" data-view="reader">Okuyucuya geçebilirsiniz →</button>
           </article>
           <article class="feature-card pattern-card">
-            <div class="feature-icon">✧</div><h3>Kaldığın yerden</h3><p>Kitabı kapatsan da son okuduğun sayfa burada kalır.</p><button class="feature-link" id="resume-btn" type="button">Devam et →</button>
+            <div class="feature-icon">▤</div><h3>Kaldığınız yerden</h3><p>Kitabınızı kapattığınızda son kaldığınız sayfa kaydedilir.</p><button class="feature-link" id="resume-btn" type="button">Devam edebilirsiniz →</button>
           </article>
         </div>
-        <div class="collection-preview"><div><span class="section-kicker">KOLEKSİYON</span><h2>En son okuduğun kitap</h2><p id="recent-book-caption">Henüz bir eser eklemediniz. İlk kitabınızla başlayın.</p></div><button class="btn btn-dark" id="recent-book-btn">Eser Aç <span>→</span></button></div>
+        <div class="collection-preview"><div><span class="section-kicker">KOLEKSİYON</span><h2>En son okuduğunuz kitap</h2><p id="recent-book-caption">Henüz bir eser eklemediniz. İlk kitabınızla başlayın.</p></div><button class="btn btn-dark" id="recent-book-btn">Eser Aç <span>→</span></button></div>
       </div>
     </section>
     <section id="library-view" class="view" hidden>
-      <div class="page-banner"><span class="section-kicker">KİTAPLIĞIN</span><h1>Kütüphanem</h1><p>Eklediğin kitaplara buradan ulaşabilirsin.</p></div>
-      <div class="content-area"><div class="library-toolbar"><div><h2>Eserlerim</h2><p id="library-count">Henüz kitap eklenmedi</p></div><button class="btn btn-dark" id="library-upload-btn">＋ PDF Ekle</button></div><div id="library-items" class="library-grid"></div><div id="library-empty" class="empty-state"><span class="empty-glyph">✧</span><h3>Henüz kitabın yok</h3><p>Bir PDF ekle, burada saklayalım. Dosyan başka bir sunucuya gönderilmez.</p><button class="btn btn-dark" id="empty-upload-btn">İlk kitabımı ekle</button></div></div>
+      <div class="page-banner"><span class="section-kicker">KÜTÜPHANENİZ</span><h1>Kütüphanem</h1><p>Eklediğiniz kitaplara buradan ulaşabilirsiniz.</p></div>
+      <div class="content-area"><div class="library-toolbar"><div><h2>Eserlerim</h2><p id="library-count">Henüz kitap eklenmedi</p></div><button class="btn btn-dark" id="library-upload-btn">＋ PDF Ekle</button></div><div id="library-items" class="library-grid"></div><div id="library-empty" class="empty-state"><span class="empty-glyph" aria-hidden="true"></span><h3>Henüz kitabınız bulunmuyor</h3><p>PDF dosyalarınızı buradan ekleyebilirsiniz. Kitaplarınız internete yüklenmez, cihazınızda saklanır.</p><button class="btn btn-dark" id="empty-upload-btn">İlk kitabımı ekle</button></div></div>
     </section>
     <section id="reader-view" class="view" hidden>
-      <div class="page-banner reader-banner"><button class="back-link" data-view="library">← Kütüphaneye dön</button><span class="section-kicker">KİTAP OKUYUCU</span><h1 id="reader-book-title">Okuma Odası</h1><p>İstediğin cümleden başlayabilir, dilediğin hızda dinleyebilirsin.</p></div>
-      <div class="content-area reader-layout"><div class="reader-main"><div class="reader-toolbar"><button id="prev-page-btn" class="page-arrow" aria-label="Önceki sayfa">← Önceki</button><span id="page-indicator">Sayfa - / -</span><button id="next-page-btn" class="page-arrow" aria-label="Sonraki sayfa">Sonraki →</button></div><div id="text-display" class="reader-paper" aria-label="PDF metni"><div class="reader-placeholder"><span>❧</span><h2>Okumaya hazır mısınız?</h2><p>Kitaplığınızdan bir eser açın veya yeni bir PDF yükleyin.</p><button id="reader-upload-btn" class="btn btn-dark">PDF Seç</button></div></div></div><aside id="controls" class="player-panel"><span class="section-kicker">DİNLEME</span><h2>Ses ayarları</h2><p class="player-description">Sana rahat gelen sesi ve hızı seç.</p><div class="player-controls"><button id="prev-sentence-btn" aria-label="Önceki cümle">⏮</button><button id="play-pause-btn" class="play-button" aria-label="Oku veya duraklat">▶ Oku</button><button id="next-sentence-btn" aria-label="Sonraki cümle">⏭</button></div><div class="setting"><label for="rate-slider">Okuma Hızı <span id="rate-value">1.0x</span></label><input type="range" id="rate-slider" min="0.5" max="2" step="0.1" value="1"></div><div class="setting"><label for="pitch-slider">Ses Tonu <span id="pitch-value">1.0</span></label><input type="range" id="pitch-slider" min="0" max="2" step="0.1" value="1"></div><div class="setting"><label for="voice-select">Anlatıcı Sesi</label><select id="voice-select"><option>Sesler yükleniyor...</option></select></div><label class="auto-option"><input id="auto-page-checkbox" type="checkbox" checked> Sayfa bitince otomatik devam et</label><div id="player-status" class="player-status" role="status" aria-live="polite">Dinlemeye başlamak için bir eser açın.</div><p class="player-warning">iPhone'da tarayıcı seslendirmesi ekran kilitlendiğinde durabilir. Arka plan dinleme sonraki sürümde geliştirilecek.</p></aside></div>
+      <div class="page-banner reader-banner"><button class="back-link" data-view="library">← Kütüphaneye dön</button><span class="section-kicker">KİTAP OKUYUCU</span><h1 id="reader-book-title">Okuma Odası</h1><p>İstediğiniz cümleden başlayabilir, tercih ettiğiniz hızda dinleyebilirsiniz.</p></div>
+      <div class="content-area reader-layout"><div class="reader-main"><div class="reader-toolbar"><button id="prev-page-btn" class="page-arrow" aria-label="Önceki sayfa">← Önceki</button><span id="page-indicator">Sayfa - / -</span><button id="next-page-btn" class="page-arrow" aria-label="Sonraki sayfa">Sonraki →</button></div><div id="text-display" class="reader-paper" aria-label="PDF metni"><div class="reader-placeholder"><span>❧</span><h2>Kitabınızı buradan açabilirsiniz</h2><p>Kütüphanenizden bir eser seçebilir veya yeni bir PDF ekleyebilirsiniz.</p><button id="reader-upload-btn" class="btn btn-dark">PDF Seç</button></div></div></div><aside id="controls" class="player-panel"><span class="section-kicker">DİNLEME</span><h2>Ses ayarları</h2><p class="player-description">Dilerseniz anlatıcı sesini ve okuma hızını değiştirebilirsiniz.</p><div class="player-controls"><button id="prev-sentence-btn" aria-label="Önceki cümle">⏮</button><button id="play-pause-btn" class="play-button" aria-label="Oku veya duraklat">▶ Oku</button><button id="next-sentence-btn" aria-label="Sonraki cümle">⏭</button></div><div class="setting"><label for="rate-slider">Okuma Hızı <span id="rate-value">1.0x</span></label><input type="range" id="rate-slider" min="0.5" max="2" step="0.1" value="1"></div><div class="setting"><label for="pitch-slider">Ses Tonu <span id="pitch-value">1.0</span></label><input type="range" id="pitch-slider" min="0" max="2" step="0.1" value="1"></div><div class="setting"><label for="voice-select">Anlatıcı Sesi</label><select id="voice-select"><option>Sesler yükleniyor...</option></select></div><label class="auto-option"><input id="auto-page-checkbox" type="checkbox" checked> Sayfa bitince otomatik devam edilsin</label><div id="player-status" class="player-status" role="status" aria-live="polite">Dinlemeye başlamak için kütüphanenizden bir eser seçebilirsiniz.</div></aside></div>
     </section>
   </main>
-  <footer class="site-footer"><span>✧ Sesli Kitap</span><span>Oku, dinle, sonra yine devam et.</span></footer>
+  <footer class="site-footer"><span>Sesli Kitap</span><span>Kişisel kütüphaneniz</span></footer>
   <nav class="mobile-nav" aria-label="Mobil menü"><button data-view="home" class="active">⌂ <span>Ana Sayfa</span></button><button data-view="library">▦ <span>Kitaplığım</span></button><button data-view="reader">♫ <span>Dinle</span></button></nav>
 </div>
 <input id="pdf-input" type="file" accept=".pdf,application/pdf" hidden>
 <div class="toast" id="status-text" role="status" aria-live="polite" hidden></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="script.js?v=2.2"></script>
+<script src="script.js?v=2.3"></script>
 </body>
 </html>
