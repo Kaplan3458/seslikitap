@@ -1,8 +1,11 @@
 {
-  "name": "Sesli Kitap",
+  "name": "Sesli Kitap | Dijital Kütüphane",
   "short_name": "Sesli Kitap",
-  "start_url": ".",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#1b1f27",
-  "theme_color": "#1b1f27"
+  "background_color": "#f7f4ed",
+  "theme_color": "#102f24",
+  "lang": "tr",
+  "description": "Kişisel PDF okuma ve Türkçe dinleme kütüphanesi"
 }

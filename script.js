@@ -1,361 +1,47 @@
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
-const state = {
-  pdf: null,
-  numPages: 0,
-  currentPage: 0,
-  pageTextCache: {},
-  sentences: [],
-  currentSentenceIndex: 0,
-  isPlaying: false,
-  rate: 1,
-  pitch: 1,
-  voice: null,
-};
-
-const el = {
-  pdfInput: document.getElementById("pdf-input"),
-  statusText: document.getElementById("status-text"),
-  readerSection: document.getElementById("reader-section"),
-  uploadSection: document.getElementById("upload-section"),
-  pageIndicator: document.getElementById("page-indicator"),
-  prevPageBtn: document.getElementById("prev-page-btn"),
-  nextPageBtn: document.getElementById("next-page-btn"),
-  textDisplay: document.getElementById("text-display"),
-  prevSentenceBtn: document.getElementById("prev-sentence-btn"),
-  nextSentenceBtn: document.getElementById("next-sentence-btn"),
-  playPauseBtn: document.getElementById("play-pause-btn"),
-  rateSlider: document.getElementById("rate-slider"),
-  rateValue: document.getElementById("rate-value"),
-  pitchSlider: document.getElementById("pitch-slider"),
-  pitchValue: document.getElementById("pitch-value"),
-  voiceSelect: document.getElementById("voice-select"),
-  autoPageCheckbox: document.getElementById("auto-page-checkbox"),
-};
-
-let wakeLock = null;
-
-async function acquireWakeLock() {
-  try {
-    if ("wakeLock" in navigator) {
-      wakeLock = await navigator.wakeLock.request("screen");
-    }
-  } catch (err) {
-    console.warn("Wake lock alınamadı:", err);
-  }
-}
-
-function releaseWakeLock() {
-  if (wakeLock) {
-    wakeLock.release();
-    wakeLock = null;
-  }
-}
-
-function loadSettings() {
-  const savedRate = localStorage.getItem("sk_rate");
-  const savedPitch = localStorage.getItem("sk_pitch");
-  if (savedRate) {
-    state.rate = parseFloat(savedRate);
-    el.rateSlider.value = state.rate;
-    el.rateValue.textContent = state.rate.toFixed(1) + "x";
-  }
-  if (savedPitch) {
-    state.pitch = parseFloat(savedPitch);
-    el.pitchSlider.value = state.pitch;
-    el.pitchValue.textContent = state.pitch.toFixed(1);
-  }
-}
-
-function populateVoiceList() {
-  const voices = speechSynthesis.getVoices();
-  if (!voices.length) return;
-
-  const savedVoiceName = localStorage.getItem("sk_voice");
-  el.voiceSelect.innerHTML = "";
-
-  const sorted = [...voices].sort((a, b) => {
-    const aTr = a.lang.startsWith("tr") ? 0 : 1;
-    const bTr = b.lang.startsWith("tr") ? 0 : 1;
-    if (aTr !== bTr) return aTr - bTr;
-    return a.name.localeCompare(b.name);
-  });
-
-  sorted.forEach((voice) => {
-    const option = document.createElement("option");
-    option.value = voice.name;
-    option.textContent = `${voice.name} (${voice.lang})`;
-    el.voiceSelect.appendChild(option);
-  });
-
-  let chosen = sorted.find((v) => v.name === savedVoiceName);
-  if (!chosen) chosen = sorted.find((v) => v.lang.startsWith("tr"));
-  if (!chosen) chosen = sorted[0];
-
-  if (chosen) {
-    el.voiceSelect.value = chosen.name;
-    state.voice = chosen;
-  }
-}
-
-function cancelSpeech() {
-  speechSynthesis.cancel();
-}
-
-function splitSentences(text) {
-  const cleaned = text.replace(/\s+/g, " ").trim();
-  if (!cleaned) return [];
-  const parts = cleaned.match(/[^.!?…]+[.!?…]*/g) || [cleaned];
-  return parts.map((s) => s.trim()).filter((s) => s.length > 0);
-}
-
-async function getPageText(pageNum) {
-  if (state.pageTextCache[pageNum]) return state.pageTextCache[pageNum];
-  const page = await state.pdf.getPage(pageNum);
-  const content = await page.getTextContent();
-  const text = content.items.map((item) => item.str).join(" ");
-  state.pageTextCache[pageNum] = text;
-  return text;
-}
-
-function renderTextDisplay() {
-  el.textDisplay.innerHTML = "";
-  state.sentences.forEach((sentence, idx) => {
-    const span = document.createElement("span");
-    span.className = "sentence";
-    span.dataset.idx = idx;
-    span.textContent = sentence + " ";
-    span.addEventListener("click", () => onSentenceClick(idx));
-    el.textDisplay.appendChild(span);
-  });
-  highlightSentence(state.currentSentenceIndex);
-}
-
-function highlightSentence(idx) {
-  el.textDisplay
-    .querySelectorAll(".sentence")
-    .forEach((node) => node.classList.remove("active"));
-  const target = el.textDisplay.querySelector(`.sentence[data-idx="${idx}"]`);
-  if (target) {
-    target.classList.add("active");
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-}
-
-function updatePageIndicator() {
-  el.pageIndicator.textContent = `Sayfa ${state.currentPage} / ${state.numPages}`;
-  el.prevPageBtn.disabled = state.currentPage <= 1;
-  el.nextPageBtn.disabled = state.currentPage >= state.numPages;
-}
-
-function updatePlayButton() {
-  el.playPauseBtn.textContent = state.isPlaying ? "⏸ Duraklat" : "▶️ Oku";
-}
-
-async function goToPage(pageNum) {
-  cancelSpeech();
-  state.currentPage = pageNum;
-  const text = await getPageText(pageNum);
-  state.sentences = splitSentences(text);
-  state.currentSentenceIndex = 0;
-  renderTextDisplay();
-  updatePageIndicator();
-}
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function getProsodyAdjustment(sentence) {
-  const lastChar = sentence.trim().slice(-1);
-  if (lastChar === "?") return { pitchDelta: 0.18, rateDelta: -0.03 };
-  if (lastChar === "!") return { pitchDelta: 0.1, rateDelta: 0.05 };
-  if (lastChar === "," || lastChar === ";" || lastChar === ":") {
-    return { pitchDelta: -0.03, rateDelta: -0.05 };
-  }
-  return { pitchDelta: 0, rateDelta: 0 };
-}
-
-function pauseAfterSentence(sentence) {
-  const lastChar = sentence.trim().slice(-1);
-  if (lastChar === "." || lastChar === "!" || lastChar === "?" || lastChar === "…") return 260;
-  if (lastChar === "," || lastChar === ";" || lastChar === ":") return 130;
-  return 60;
-}
-
-let speechToken = 0;
-
-function speakCurrentSentence() {
-  speechToken++;
-  const token = speechToken;
-  cancelSpeech();
-
-  const sentence = state.sentences[state.currentSentenceIndex];
-
-  if (!sentence) {
-    onPageFinished();
-    return;
-  }
-
-  highlightSentence(state.currentSentenceIndex);
-
-  const prosody = getProsodyAdjustment(sentence);
-  const utterance = new SpeechSynthesisUtterance(sentence);
-  utterance.rate = clamp(state.rate + prosody.rateDelta, 0.3, 3);
-  utterance.pitch = clamp(state.pitch + prosody.pitchDelta, 0, 2);
-  if (state.voice) {
-    utterance.voice = state.voice;
-    utterance.lang = state.voice.lang;
-  }
-
-  utterance.onend = () => {
-    if (!state.isPlaying || token !== speechToken) return;
-    const pause = pauseAfterSentence(sentence);
-    state.currentSentenceIndex++;
-    setTimeout(() => {
-      if (!state.isPlaying || token !== speechToken) return;
-      speakCurrentSentence();
-    }, pause);
-  };
-
-  utterance.onerror = (e) => {
-    console.error("Konuşma hatası:", e);
-  };
-
-  speechSynthesis.speak(utterance);
-}
-
-async function onPageFinished() {
-  const canAdvance =
-    el.autoPageCheckbox.checked && state.currentPage < state.numPages;
-
-  if (canAdvance) {
-    await goToPage(state.currentPage + 1);
-    if (state.isPlaying) speakCurrentSentence();
-  } else {
-    stopPlayback();
-  }
-}
-
-function startPlayback() {
-  if (!state.sentences.length) return;
-  state.isPlaying = true;
-  acquireWakeLock();
-  updatePlayButton();
-  speakCurrentSentence();
-}
-
-function stopPlayback() {
-  state.isPlaying = false;
-  cancelSpeech();
-  releaseWakeLock();
-  updatePlayButton();
-}
-
-function togglePlayPause() {
-  if (state.isPlaying) {
-    stopPlayback();
-  } else {
-    startPlayback();
-  }
-}
-
-function onSentenceClick(idx) {
-  state.currentSentenceIndex = idx;
-  highlightSentence(idx);
-  if (state.isPlaying) speakCurrentSentence();
-}
-
-function goToPrevSentence() {
-  if (state.currentSentenceIndex > 0) {
-    state.currentSentenceIndex--;
-    highlightSentence(state.currentSentenceIndex);
-    if (state.isPlaying) speakCurrentSentence();
-  }
-}
-
-function goToNextSentence() {
-  if (state.currentSentenceIndex < state.sentences.length - 1) {
-    state.currentSentenceIndex++;
-    highlightSentence(state.currentSentenceIndex);
-    if (state.isPlaying) speakCurrentSentence();
-  }
-}
-
-async function handlePdfUpload(file) {
-  el.statusText.textContent = "PDF yükleniyor...";
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    state.pdf = pdf;
-    state.numPages = pdf.numPages;
-    state.pageTextCache = {};
-
-    el.uploadSection.hidden = true;
-    el.readerSection.hidden = false;
-
-    await goToPage(1);
-  } catch (err) {
-    console.error(err);
-    el.statusText.textContent = "PDF okunamadı, başka bir dosya dene.";
-  }
-}
-
-el.pdfInput.addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if (file) handlePdfUpload(file);
-});
-
-el.playPauseBtn.addEventListener("click", togglePlayPause);
-el.prevSentenceBtn.addEventListener("click", goToPrevSentence);
-el.nextSentenceBtn.addEventListener("click", goToNextSentence);
-
-el.prevPageBtn.addEventListener("click", async () => {
-  if (state.currentPage > 1) {
-    const wasPlaying = state.isPlaying;
-    await goToPage(state.currentPage - 1);
-    if (wasPlaying) speakCurrentSentence();
-  }
-});
-
-el.nextPageBtn.addEventListener("click", async () => {
-  if (state.currentPage < state.numPages) {
-    const wasPlaying = state.isPlaying;
-    await goToPage(state.currentPage + 1);
-    if (wasPlaying) speakCurrentSentence();
-  }
-});
-
-el.rateSlider.addEventListener("input", () => {
-  state.rate = parseFloat(el.rateSlider.value);
-  el.rateValue.textContent = state.rate.toFixed(1) + "x";
-  localStorage.setItem("sk_rate", state.rate);
-  if (state.isPlaying) speakCurrentSentence();
-});
-
-el.pitchSlider.addEventListener("input", () => {
-  state.pitch = parseFloat(el.pitchSlider.value);
-  el.pitchValue.textContent = state.pitch.toFixed(1);
-  localStorage.setItem("sk_pitch", state.pitch);
-  if (state.isPlaying) speakCurrentSentence();
-});
-
-el.voiceSelect.addEventListener("change", () => {
-  const voices = speechSynthesis.getVoices();
-  state.voice = voices.find((v) => v.name === el.voiceSelect.value) || null;
-  if (state.voice) localStorage.setItem("sk_voice", state.voice.name);
-  if (state.isPlaying) speakCurrentSentence();
-});
-
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && state.isPlaying) {
-    acquireWakeLock();
-  }
-});
-
-loadSettings();
-populateVoiceList();
-if ("onvoiceschanged" in speechSynthesis) {
-  speechSynthesis.onvoiceschanged = populateVoiceList;
-}
+/* Sesli Kitap V2 — Vanilla JS, local PDF processing */
+'use strict';
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const $ = id => document.getElementById(id);
+const state = {pdf:null,file:null,bookId:null,numPages:0,currentPage:0,pageTextCache:new Map(),sentences:[],currentSentenceIndex:0,isPlaying:false,rate:1,pitch:1,voice:null,transition:0,speechToken:0};
+const canSpeak = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+const el = {pdfInput:$('pdf-input'),statusText:$('status-text'),readerSection:$('reader-view'),pageIndicator:$('page-indicator'),prevPageBtn:$('prev-page-btn'),nextPageBtn:$('next-page-btn'),textDisplay:$('text-display'),prevSentenceBtn:$('prev-sentence-btn'),nextSentenceBtn:$('next-sentence-btn'),playPauseBtn:$('play-pause-btn'),rateSlider:$('rate-slider'),rateValue:$('rate-value'),pitchSlider:$('pitch-slider'),pitchValue:$('pitch-value'),voiceSelect:$('voice-select'),autoPageCheckbox:$('auto-page-checkbox'),playerStatus:$('player-status')};
+let wakeLock=null,toastTimer=null;
+const getSafe = key=>{try{return localStorage.getItem(key)}catch{return null}};
+const setSafe = (key,value)=>{try{localStorage.setItem(key,String(value))}catch{}};
+function toast(message){el.statusText.textContent=message;el.statusText.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.statusText.hidden=true,5000)}
+function playerMessage(message){el.playerStatus.textContent=message}
+function setView(view){if(view==='reader'&&!state.pdf)playerMessage('Dinlemek için önce bir PDF açın.');['home','library','reader'].forEach(v=>$(v+'-view').hidden=v!==view);document.querySelectorAll('[data-view]').forEach(b=>{const active=b.dataset.view===view;b.classList.toggle('active',active);if(b.classList.contains('nav-link'))b.setAttribute('aria-current',active?'page':'false')});window.scrollTo({top:0,behavior:'instant'});if(view==='library')renderLibrary()}
+document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>setView(button.dataset.view)));
+$('home-link').addEventListener('click',e=>{e.preventDefault();setView('home')});
+['header-upload-btn','hero-upload-btn','library-upload-btn','empty-upload-btn','reader-upload-btn'].forEach(id=>$(id).addEventListener('click',()=>el.pdfInput.click()));
+function resumeBook(){if(state.pdf){setView('reader');return}const book=getCurrentBook();if(book){toast('Kayıtlı eser: '+book.name+'. Devam etmek için aynı PDF dosyasını yeniden seçin.');el.pdfInput.click()}else{setView('library')}}
+$('resume-btn').addEventListener('click',resumeBook);$('recent-book-btn').addEventListener('click',resumeBook);
+function loadBooks(){try{const books=JSON.parse(getSafe('sk_v2_books')||'[]');return Array.isArray(books)?books:[]}catch{return []}}
+function storeBooks(books){setSafe('sk_v2_books',JSON.stringify(books.slice(0,60)))}
+function getCurrentBook(){return loadBooks()[0]||null}
+function bookKey(file){return `${file.name}:${file.size}:${file.lastModified}`}
+function saveProgress(){if(!state.bookId)return;const books=loadBooks();const index=books.findIndex(b=>b.id===state.bookId);if(index<0)return;books[index]={...books[index],page:state.currentPage,sentence:state.currentSentenceIndex,lastOpened:Date.now()};books.sort((a,b)=>b.lastOpened-a.lastOpened);storeBooks(books)}
+function renderLibrary(){const books=loadBooks();$('library-count').textContent=books.length?`${books.length} eser`:'Henüz kitap eklenmedi';$('library-empty').hidden=books.length>0;const grid=$('library-items');grid.replaceChildren();books.forEach(book=>{const card=document.createElement('article');card.className='book-card';const art=document.createElement('div');art.className='book-art';const title=document.createElement('h3');title.textContent=book.name;const meta=document.createElement('p');meta.textContent=book.page?`Son okunan sayfa: ${book.page}`:'Henüz okunmadı';const button=document.createElement('button');button.textContent=book.id===state.bookId?'Okumaya devam et':'Dosyayı yeniden seç';button.addEventListener('click',()=>{if(book.id===state.bookId){setView('reader')}else{toast('Tarayıcınız PDF dosyasını saklamıyor. Lütfen aynı dosyayı yeniden seçin.');el.pdfInput.click()}});card.append(art,title,meta,button);grid.append(card)});const recent=getCurrentBook();$('recent-book-caption').textContent=recent?`${recent.name} · Sayfa ${recent.page||1}`:'Henüz bir eser eklemediniz. İlk kitabınızla başlayın.'}
+function loadSettings(){const rate=Number(getSafe('sk_rate')),pitch=Number(getSafe('sk_pitch'));if(Number.isFinite(rate)&&rate>=.5&&rate<=2)state.rate=rate;if(getSafe('sk_pitch')!==null&&Number.isFinite(pitch)&&pitch>=0&&pitch<=2)state.pitch=pitch;el.rateSlider.value=state.rate;el.pitchSlider.value=state.pitch;el.rateValue.textContent=state.rate.toFixed(1)+'x';el.pitchValue.textContent=state.pitch.toFixed(1)}
+function populateVoiceList(){if(!canSpeak){el.voiceSelect.innerHTML='<option>Bu tarayıcıda seslendirme yok</option>';return}const voices=speechSynthesis.getVoices();if(!voices.length)return;const sorted=[...voices].sort((a,b)=>Number(!a.lang.toLowerCase().startsWith('tr'))-Number(!b.lang.toLowerCase().startsWith('tr'))||a.name.localeCompare(b.name,'tr'));const selected=getSafe('sk_voice');el.voiceSelect.replaceChildren();sorted.forEach(v=>{const option=document.createElement('option');option.value=v.voiceURI;option.textContent=`${v.name} (${v.lang})`;el.voiceSelect.append(option)});state.voice=sorted.find(v=>v.voiceURI===selected)||sorted.find(v=>v.lang.toLowerCase().startsWith('tr'))||sorted[0];el.voiceSelect.value=state.voice.voiceURI}
+async function acquireWakeLock(){try{if('wakeLock' in navigator&&!wakeLock)wakeLock=await navigator.wakeLock.request('screen')}catch(err){console.info('Wake lock alınamadı',err)}}
+function releaseWakeLock(){if(wakeLock){wakeLock.release().catch(()=>{});wakeLock=null}}
+function invalidateSpeech(){state.speechToken++;if(canSpeak)speechSynthesis.cancel()}
+function stopPlayback(){state.isPlaying=false;invalidateSpeech();releaseWakeLock();updatePlayButton();saveProgress()}
+function updatePlayButton(){el.playPauseBtn.textContent=state.isPlaying?'Ⅱ Duraklat':'▶ Oku';el.playPauseBtn.setAttribute('aria-pressed',String(state.isPlaying))}
+function splitSentences(text){const cleaned=text.replace(/\s+/g,' ').trim();if(!cleaned)return[];if('Segmenter' in Intl){try{return [...new Intl.Segmenter('tr',{granularity:'sentence'}).segment(cleaned)].map(v=>v.segment.trim()).filter(Boolean)}catch{}}return (cleaned.match(/[^.!?…]+[.!?…]*/g)||[cleaned]).map(s=>s.trim()).filter(Boolean)}
+async function getPageText(num,pdf=state.pdf){if(state.pageTextCache.has(num))return state.pageTextCache.get(num);const page=await pdf.getPage(num);const content=await page.getTextContent();let text='';for(const item of content.items){if(!('str' in item))continue;const str=item.str||'';text+=str;if(item.hasEOL)text+='\n';else if(str&&!/\s$/.test(str))text+=' '}state.pageTextCache.set(num,text);return text}
+function highlightSentence(idx){el.textDisplay.querySelectorAll('.sentence.active').forEach(n=>n.classList.remove('active'));const target=el.textDisplay.querySelector(`.sentence[data-idx="${idx}"]`);if(target){target.classList.add('active');target.scrollIntoView({block:'nearest',behavior:'smooth'})}}
+function renderText(){el.textDisplay.replaceChildren();if(!state.sentences.length){const p=document.createElement('p');p.textContent='Bu sayfada seçilebilir metin bulunamadı. Taranmış PDF için OCR özelliği gereklidir.';el.textDisplay.append(p);return}const frag=document.createDocumentFragment();state.sentences.forEach((sentence,idx)=>{const span=document.createElement('span');span.className='sentence';span.dataset.idx=idx;span.textContent=sentence+' ';span.addEventListener('click',()=>{state.currentSentenceIndex=idx;highlightSentence(idx);saveProgress();if(state.isPlaying)speakCurrentSentence()});frag.append(span)});el.textDisplay.append(frag);highlightSentence(state.currentSentenceIndex)}
+function updatePageIndicator(){el.pageIndicator.textContent=`Sayfa ${state.currentPage} / ${state.numPages}`;el.prevPageBtn.disabled=state.currentPage<=1;el.nextPageBtn.disabled=state.currentPage>=state.numPages}
+async function goToPage(pageNum,{resumeSentence=0,continuePlaying=false}={}){if(!state.pdf||pageNum<1||pageNum>state.numPages)return;const request=++state.transition;invalidateSpeech();try{const text=await getPageText(pageNum);if(request!==state.transition)return;state.currentPage=pageNum;state.sentences=splitSentences(text);state.currentSentenceIndex=Math.min(Math.max(0,resumeSentence),Math.max(0,state.sentences.length-1));renderText();updatePageIndicator();saveProgress();if(continuePlaying&&state.isPlaying){if(state.sentences.length)speakCurrentSentence();else await onPageFinished()}else if(state.isPlaying){state.isPlaying=false;releaseWakeLock();updatePlayButton()}}catch(err){console.error(err);stopPlayback();toast('Bu PDF sayfası okunamadı.');playerMessage('Sayfa okuma hatası.')}}
+function clamp(v,min,max){return Math.min(max,Math.max(min,v))}
+function speakCurrentSentence(){if(!state.isPlaying||!canSpeak)return;invalidateSpeech();const token=state.speechToken;const sentence=state.sentences[state.currentSentenceIndex];if(!sentence){void onPageFinished();return}highlightSentence(state.currentSentenceIndex);saveProgress();const utterance=new SpeechSynthesisUtterance(sentence);utterance.lang=state.voice?.lang||'tr-TR';if(state.voice)utterance.voice=state.voice;utterance.rate=clamp(state.rate+(sentence.endsWith('?')?-.03:0),.5,2);utterance.pitch=clamp(state.pitch+(sentence.endsWith('?')?.10:0),0,2);utterance.onend=()=>{if(!state.isPlaying||token!==state.speechToken)return;state.currentSentenceIndex++;saveProgress();setTimeout(()=>{if(state.isPlaying&&token===state.speechToken)speakCurrentSentence()},220)};utterance.onerror=e=>{if(token!==state.speechToken||!state.isPlaying)return;if(e.error==='canceled'||e.error==='interrupted')return;console.error('Konuşma hatası:',e.error);stopPlayback();playerMessage('Seslendirme başarısız oldu. Başka bir ses seçip tekrar deneyin.');toast('Seslendirme hatası: '+(e.error||'bilinmeyen'))};speechSynthesis.speak(utterance);playerMessage(`Okunuyor · Sayfa ${state.currentPage} · Cümle ${state.currentSentenceIndex+1}/${state.sentences.length}`)}
+async function onPageFinished(){if(!state.isPlaying)return;if(el.autoPageCheckbox.checked&&state.currentPage<state.numPages){await goToPage(state.currentPage+1,{continuePlaying:true})}else{stopPlayback();playerMessage('Bu sayfanın okuması tamamlandı.')}}
+function startPlayback(){if(!state.pdf){toast('Önce bir PDF ekleyin.');return}if(!canSpeak){toast('Bu tarayıcı seslendirmeyi desteklemiyor.');return}if(!state.sentences.length){toast('Bu sayfada okunabilir metin yok.');return}state.isPlaying=true;updatePlayButton();void acquireWakeLock();speakCurrentSentence()}
+function changeSentence(delta){if(!state.sentences.length)return;state.currentSentenceIndex=clamp(state.currentSentenceIndex+delta,0,state.sentences.length-1);highlightSentence(state.currentSentenceIndex);saveProgress();if(state.isPlaying)speakCurrentSentence()}
+async function handlePdfUpload(file){if(!file)return;if(!/\.pdf$/i.test(file.name)&&file.type!=='application/pdf'){toast('Lütfen PDF dosyası seçin.');return}if(!window.pdfjsLib){toast('PDF okuyucu yüklenemedi. İnternet bağlantınızı kontrol edin.');return}stopPlayback();const openId=++state.transition;toast('Kitabınız açılıyor...');try{const buffer=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buffer}).promise;if(openId!==state.transition){await pdf.destroy();return}if(state.pdf)await state.pdf.destroy();state.pdf=pdf;state.file=file;state.bookId=bookKey(file);state.numPages=pdf.numPages;state.pageTextCache.clear();const books=loadBooks();const previous=books.find(b=>b.id===state.bookId);const keep=books.filter(b=>b.id!==state.bookId);keep.unshift({id:state.bookId,name:file.name.replace(/\.pdf$/i,''),page:previous?.page||1,sentence:previous?.sentence||0,lastOpened:Date.now()});storeBooks(keep);$('reader-book-title').textContent=file.name.replace(/\.pdf$/i,'');await goToPage(previous?.page||1,{resumeSentence:previous?.sentence||0});setView('reader');playerMessage('Eser hazır. Dinlemek için Oku düğmesine basın.');toast('PDF açıldı. Dosyanız cihazınızda işlendi.')}catch(err){console.error(err);toast('PDF açılamadı. Dosyanın bozuk ya da şifreli olmadığını kontrol edin.')}}
+el.pdfInput.addEventListener('change',e=>{const file=e.target.files?.[0];if(file)void handlePdfUpload(file);el.pdfInput.value=''});
+el.playPauseBtn.addEventListener('click',()=>state.isPlaying?stopPlayback():startPlayback());el.prevSentenceBtn.addEventListener('click',()=>changeSentence(-1));el.nextSentenceBtn.addEventListener('click',()=>changeSentence(1));el.prevPageBtn.addEventListener('click',()=>{void goToPage(state.currentPage-1,{continuePlaying:state.isPlaying})});el.nextPageBtn.addEventListener('click',()=>{void goToPage(state.currentPage+1,{continuePlaying:state.isPlaying})});
+el.rateSlider.addEventListener('input',()=>{state.rate=Number(el.rateSlider.value);el.rateValue.textContent=state.rate.toFixed(1)+'x';setSafe('sk_rate',state.rate);if(state.isPlaying)speakCurrentSentence()});el.pitchSlider.addEventListener('input',()=>{state.pitch=Number(el.pitchSlider.value);el.pitchValue.textContent=state.pitch.toFixed(1);setSafe('sk_pitch',state.pitch);if(state.isPlaying)speakCurrentSentence()});el.voiceSelect.addEventListener('change',()=>{state.voice=canSpeak?speechSynthesis.getVoices().find(v=>v.voiceURI===el.voiceSelect.value)||null:null;if(state.voice)setSafe('sk_voice',state.voice.voiceURI);if(state.isPlaying)speakCurrentSentence()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.isPlaying)void acquireWakeLock()});window.addEventListener('pagehide',()=>saveProgress());loadSettings();populateVoiceList();if(canSpeak&&'onvoiceschanged' in speechSynthesis)speechSynthesis.onvoiceschanged=populateVoiceList;renderLibrary();updatePlayButton();
