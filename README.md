@@ -18,3 +18,10 @@ Tarayıcıda `speechSynthesis.getVoices()` ile sunulan cihaz sesleri seçilebili
 
 ## Gizlilik
 PDF içerikleri bu sürümde cihazın tarayıcı veritabanında saklanır; herhangi bir uzak dosya yükleme servisine gönderilmez. Ancak PDF.js ve fontlar ilk yüklemede harici CDN üzerinden yüklenir. Cihazda saklanan dosyalar tarayıcı verileri temizlenirse kaybolabilir.
+
+
+## V2.4 — Görsel yerleşim düzeltmesi
+- Kütüphanedeki **PDF Ekle** düğmesi artık **Eserlerim** başlığının yanında, tutarlı boşluklarla yer alır; mobilde de başlık grubuyla birlikte yerleşir.
+- Kütüphane ve okuyucu bannerlarındaki kitap amblemleri üstten taşmak yerine banner içinde dikey olarak ortalanır.
+- PDF saklama, kitap silme ve seslendirme JavaScript kodu değiştirilmedi.
+- Tarayıcı önbelleği için CSS/JS sürüm parametresi `2.4` olarak güncellendi.

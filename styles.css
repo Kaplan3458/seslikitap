@@ -42,3 +42,18 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .empty-glyph{font-size:0;display:inline-block;width:90px;height:90px;background:url('kitap-logo.png') center / contain no-repeat}
 .feature-card h3{line-height:1.3}
 @media(max-width:550px){.brand-logo{width:44px;height:44px}.brand-name{font-size:19px}.brand-name small{font-size:8.5px;letter-spacing:.08em}.hero p{font-size:14px;line-height:1.85}.hero h1{font-size:clamp(33px,9vw,46px)}.hero-note{font-size:11px}}
+
+/* V2.4 — Kütüphane eylemi başlığın yanında; logo her banner içinde ortalı */
+#library-view .library-toolbar{justify-content:flex-start;align-items:center;gap:clamp(18px,3vw,40px);flex-wrap:wrap;margin-bottom:24px}
+#library-view .library-heading{flex:0 1 auto;min-width:0}
+#library-view .library-heading h2{margin:0 0 6px}
+#library-view .library-add-btn{flex:none;justify-content:center;gap:9px;white-space:nowrap;padding:12px 19px;min-height:46px;box-shadow:0 3px 9px #0e2c2114}
+#library-view .library-add-btn:hover{background:#22533e}
+.page-banner{isolation:isolate}
+.page-banner::after{content:'';position:absolute;top:50%;right:clamp(24px,6vw,110px);transform:translateY(-50%);width:clamp(130px,12.5vw,205px);height:clamp(130px,12.5vw,205px);background:url('kitap-logo.png') center/contain no-repeat;opacity:.11;pointer-events:none;z-index:0}
+.page-banner > *{position:relative;z-index:1}
+@media(max-width:550px){
+  #library-view .library-toolbar{gap:15px;align-items:center;justify-content:flex-start}
+  #library-view .library-add-btn{padding:11px 15px;font-size:12px;min-height:44px}
+  .page-banner::after{right:8px;width:126px;height:126px;opacity:.065}
+}

@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.3">
+  <link rel="stylesheet" href="styles.css?v=2.4">
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
@@ -65,7 +65,7 @@
     </section>
     <section id="library-view" class="view" hidden>
       <div class="page-banner"><span class="section-kicker">KÜTÜPHANENİZ</span><h1>Kütüphanem</h1><p>Eklediğiniz kitaplara buradan ulaşabilirsiniz.</p></div>
-      <div class="content-area"><div class="library-toolbar"><div><h2>Eserlerim</h2><p id="library-count">Henüz kitap eklenmedi</p></div><button class="btn btn-dark" id="library-upload-btn">＋ PDF Ekle</button></div><div id="library-items" class="library-grid"></div><div id="library-empty" class="empty-state"><span class="empty-glyph" aria-hidden="true"></span><h3>Henüz kitabınız bulunmuyor</h3><p>PDF dosyalarınızı buradan ekleyebilirsiniz. Kitaplarınız internete yüklenmez, cihazınızda saklanır.</p><button class="btn btn-dark" id="empty-upload-btn">İlk kitabımı ekle</button></div></div>
+      <div class="content-area"><div class="library-toolbar"><div class="library-heading"><h2>Eserlerim</h2><p id="library-count">Henüz kitap eklenmedi</p></div><button class="btn btn-dark library-add-btn" id="library-upload-btn" type="button">＋ PDF Ekle</button></div><div id="library-items" class="library-grid"></div><div id="library-empty" class="empty-state"><span class="empty-glyph" aria-hidden="true"></span><h3>Henüz kitabınız bulunmuyor</h3><p>PDF dosyalarınızı buradan ekleyebilirsiniz. Kitaplarınız internete yüklenmez, cihazınızda saklanır.</p><button class="btn btn-dark" id="empty-upload-btn">İlk kitabımı ekle</button></div></div>
     </section>
     <section id="reader-view" class="view" hidden>
       <div class="page-banner reader-banner"><button class="back-link" data-view="library">← Kütüphaneye dön</button><span class="section-kicker">KİTAP OKUYUCU</span><h1 id="reader-book-title">Okuma Odası</h1><p>İstediğiniz cümleden başlayabilir, tercih ettiğiniz hızda dinleyebilirsiniz.</p></div>
@@ -78,6 +78,6 @@
 <input id="pdf-input" type="file" accept=".pdf,application/pdf" hidden>
 <div class="toast" id="status-text" role="status" aria-live="polite" hidden></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="script.js?v=2.3"></script>
+<script src="script.js?v=2.4"></script>
 </body>
 </html>
