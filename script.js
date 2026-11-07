@@ -163,8 +163,34 @@ async function goToPage(pageNum) {
   updatePageIndicator();
 }
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getProsodyAdjustment(sentence) {
+  const lastChar = sentence.trim().slice(-1);
+  if (lastChar === "?") return { pitchDelta: 0.18, rateDelta: -0.03 };
+  if (lastChar === "!") return { pitchDelta: 0.1, rateDelta: 0.05 };
+  if (lastChar === "," || lastChar === ";" || lastChar === ":") {
+    return { pitchDelta: -0.03, rateDelta: -0.05 };
+  }
+  return { pitchDelta: 0, rateDelta: 0 };
+}
+
+function pauseAfterSentence(sentence) {
+  const lastChar = sentence.trim().slice(-1);
+  if (lastChar === "." || lastChar === "!" || lastChar === "?" || lastChar === "…") return 260;
+  if (lastChar === "," || lastChar === ";" || lastChar === ":") return 130;
+  return 60;
+}
+
+let speechToken = 0;
+
 function speakCurrentSentence() {
+  speechToken++;
+  const token = speechToken;
   cancelSpeech();
+
   const sentence = state.sentences[state.currentSentenceIndex];
 
   if (!sentence) {
@@ -174,15 +200,23 @@ function speakCurrentSentence() {
 
   highlightSentence(state.currentSentenceIndex);
 
+  const prosody = getProsodyAdjustment(sentence);
   const utterance = new SpeechSynthesisUtterance(sentence);
-  utterance.rate = state.rate;
-  utterance.pitch = state.pitch;
-  if (state.voice) utterance.voice = state.voice;
+  utterance.rate = clamp(state.rate + prosody.rateDelta, 0.3, 3);
+  utterance.pitch = clamp(state.pitch + prosody.pitchDelta, 0, 2);
+  if (state.voice) {
+    utterance.voice = state.voice;
+    utterance.lang = state.voice.lang;
+  }
 
   utterance.onend = () => {
-    if (!state.isPlaying) return;
+    if (!state.isPlaying || token !== speechToken) return;
+    const pause = pauseAfterSentence(sentence);
     state.currentSentenceIndex++;
-    speakCurrentSentence();
+    setTimeout(() => {
+      if (!state.isPlaying || token !== speechToken) return;
+      speakCurrentSentence();
+    }, pause);
   };
 
   utterance.onerror = (e) => {
